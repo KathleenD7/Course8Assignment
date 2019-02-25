@@ -1,0 +1,85 @@
+---
+title: "Course8Assignment"
+output:
+  word_document: default
+  pdf_document: default
+---
+
+###Overview
+Using devices such as Jawbone Up, Nike FuelBand, and Fitbit it is now possible to collect a large amount of data about personal activity relatively inexpensively. These type of devices are part of the quantified self movement - a group of enthusiasts who take measurements about themselves regularly to improve their health, to find patterns in their behavior, or because they are tech geeks. One thing that people regularly do is quantify how much of a particular activity they do, but they rarely quantify how well they do it. In this project, the goal was to use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants. They were asked to perform barbell lifts correctly and incorrectly in 5 different ways. 
+
+The goal of the project was to predict the manner in which they did the exercise. Then, to create a report describing how the model was built, how cross validation was used, what is the sample error, and why choices were made. The Prediction Model will also predict 20 different test cases. 
+
+
+
+###Loading Packages
+```{r echo=TRUE}
+library(caret)
+library(lattice)
+library(ggplot2)
+library(randomForest)
+library(rattle)
+library(RColorBrewer)
+library(rpart)
+```
+
+
+###Reading in the Data
+```{r echo=TRUE}
+training <- read.csv("~/pml-training.csv")
+testing <- read.csv("~/pml-testing.csv")
+ 
+```
+
+
+###Exploratory Analysis
+```{r echo=TRUE}
+summary(training)
+dim(training)
+```
+
+###Clean the Data
+```{r echo=TRUE}
+numberofNAs<-sapply(testing, function(y) sum((is.na(y))))
+NAvalues<-numberofNAs[numberofNAs==20]
+removeNAs<-names(NAvalues)
+cleanTraining<-training[,!(names(training)%in% removeNAs)]
+cleanTraining<-cleanTraining[c(-1,-2,-3,-4,-5,-6,-7)]
+
+```
+First, I remove any columns with NAs. Next, I removed any columns that were not relevant.
+
+###Method Used: Random Forest
+```{r echo=TRUE}
+x<-cleanTraining[,-53]
+y<-cleanTraining[,53]
+library(foreach)
+library(iterators)
+library(parallel)
+library(doParallel)
+cluster <- makeCluster(detectCores() - 1) # convention to leave 1 core for OS
+registerDoParallel(cluster)
+fitControl <- trainControl(method = "cv",number = 5,verboseIter=FALSE)
+fit <- train(x,y, method="rf",data=cleanTraining,trControl=fitControl)
+stopCluster(cluster)
+registerDoSEQ()
+fit
+pred<-predict(fit,cleanTraining)
+confusionMatrix(cleanTraining$classe,pred)
+```
+From the confusion Matrix we can tell the accuracy is 1 and the error is 0.
+
+###Using the Results to Predict the Test Set
+```{r echo=TRUE}
+cleanTesting<-testing[,!(names(training)%in% removeNAs)]
+cleanTesting<-cleanTesting[c(-1,-2,-3,-4,-5,-6,-7)]
+predictTesting<-predict(fit,cleanTesting[,-length(names(cleanTesting))])
+predictTesting
+```
+Therefore, these are the classe for all of the test data points
+
+###Appendix
+```{r echo=TRUE}
+tree<-rpart(classe~., data=cleanTraining,method="class")
+fancyRpartPlot(tree)
+```
